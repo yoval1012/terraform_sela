@@ -211,7 +211,7 @@ resource "azurerm_virtual_machine" "vm1" {
 
  }
  
- resource "azurerm_virtual_machine_extension" "install_flask" {
+resource "azurerm_virtual_machine_extension" "install_flask" {
   name                 = "install-flask"
   virtual_machine_id   = azurerm_virtual_machine.vm1.id  
   publisher            = "Microsoft.Azure.Extensions"
