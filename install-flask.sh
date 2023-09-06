@@ -20,6 +20,6 @@ if __name__ == '__main__':
 EOL
 
 # Run the Flask app
-python3 app.py
+nohup python3 app.py > /dev/null 2>&1 &
 
 
