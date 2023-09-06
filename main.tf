@@ -155,10 +155,16 @@ resource "azurerm_network_interface" "nic1" {
     private_ip_address            = "10.0.1.4"
   }
   # Public IP configuration
-   enable_ip_forwarding = true  # This enables IP forwarding
-   tags = {
-     environment = "dev"
+  enable_ip_forwarding = true  # This enables IP forwarding
+  tags = {
+    environment = "dev"
   }
+}
+resource "azurerm_public_ip" "public_ip_vm1" {
+  name                = "example-public-ip-vm1"
+  location            = var.azure_region
+  resource_group_name = var.rg
+  allocation_method   = "Dynamic"  
 }
 
 resource "azurerm_virtual_machine" "vm1" {
