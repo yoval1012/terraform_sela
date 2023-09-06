@@ -154,6 +154,11 @@ resource "azurerm_network_interface" "nic1" {
     private_ip_address_allocation = "Static"
     private_ip_address            = "10.0.1.4"
   }
+  # Public IP configuration
+   enable_ip_forwarding = true  # This enables IP forwarding
+   tags = {
+     environment = "dev"
+  }
 }
 
 resource "azurerm_virtual_machine" "vm1" {
