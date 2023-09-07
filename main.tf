@@ -1,3 +1,4 @@
+
 resource "azurerm_resource_group" "rg-library-dev" {
   name     = var.rg  
   location = var.azure_region
@@ -155,16 +156,7 @@ resource "azurerm_network_interface" "nic1" {
   location            = var.azure_region
   resource_group_name = var.rg
 
-  # ip_configuration {
-  #   name                          = "internal"
-  #   subnet_id                     = data.azurerm_subnet.subnet1.id 
-  #   private_ip_address_allocation = "Static"
-  #   private_ip_address            = "10.0.1.4"
-    
-
-  # }
-
-  # Associate the public IP address with this network interface
+  
   ip_configuration {
     name                          = "public"
     subnet_id                     = data.azurerm_subnet.subnet1.id
@@ -196,7 +188,7 @@ resource "azurerm_virtual_machine" "vm1" {
   
   os_profile {
     computer_name  = "hostname1"
-    admin_username = "yuvalleibovich"
+    admin_username = var.user
   
   }
   
@@ -211,20 +203,7 @@ resource "azurerm_virtual_machine" "vm1" {
 
 
  
-#   provisioner "remote-exec" {
-#     inline = [
-#       "sudo apt-get update",
-#       "sudo apt-get install -y python3-pip",
-#       "sudo pip3 install Flask",
-#       "echo $(hostname -I) >> output.txt"
-#     ]
-#   }
-#   connection {
-#   type     = "ssh"
-#   user     = "yuvalleibovich"  
-#   host     = "10.0.1.4"
-#   private_key = file("~/.ssh/id_rsa_vm1")
-# }
+
 
  }
  
@@ -292,7 +271,7 @@ resource "azurerm_virtual_machine" "vm2" {
   
   os_profile {
     computer_name  = "hostname2"
-    admin_username = "yuvalleibovich"
+    admin_username = var.user
 
     
   }
@@ -345,10 +324,3 @@ PROTECTED_SETTINGS
     azurerm_virtual_machine.vm2  
   ]
 }
-
-
-
-
- 
-
-
