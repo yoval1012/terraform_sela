@@ -143,28 +143,34 @@ resource "local_file" "vm2_private_key" {
 
 # ---------------------------------------------------------------------vm1
 
+resource "azurerm_public_ip" "public_ip_vm1" {
+  name                = "public-ip-vm1"
+  location            = var.azure_region
+  resource_group_name = azurerm_resource_group.rg-library-dev.name
+  allocation_method   = "Dynamic"  # You can use "Static" if you need a static IP
+}
+
 resource "azurerm_network_interface" "nic1" {
   name                = "example-nic1"
   location            = var.azure_region
   resource_group_name = var.rg
 
+  # ip_configuration {
+  #   name                          = "internal"
+  #   subnet_id                     = data.azurerm_subnet.subnet1.id 
+  #   private_ip_address_allocation = "Static"
+  #   private_ip_address            = "10.0.1.4"
+    
+
+  # }
+
+  # Associate the public IP address with this network interface
   ip_configuration {
-    name                          = "internal"
-    subnet_id                     = data.azurerm_subnet.subnet1.id 
-    private_ip_address_allocation = "Static"
-    private_ip_address            = "10.0.1.4"
+    name                          = "public"
+    subnet_id                     = data.azurerm_subnet.subnet1.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.public_ip_vm1.id
   }
-  # Public IP configuration
-  enable_ip_forwarding = true  # This enables IP forwarding
-  tags = {
-    environment = "dev"
-  }
-}
-resource "azurerm_public_ip" "public_ip_vm1" {
-  name                = "example-public-ip-vm1"
-  location            = var.azure_region
-  resource_group_name = var.rg
-  allocation_method   = "Dynamic"  
 }
 
 resource "azurerm_virtual_machine" "vm1" {
@@ -339,6 +345,9 @@ PROTECTED_SETTINGS
     azurerm_virtual_machine.vm2  
   ]
 }
+
+
+
 
  
 
