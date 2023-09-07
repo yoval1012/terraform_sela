@@ -10,6 +10,10 @@ cat <<EOL > app.py
 from flask import Flask
 import psycopg2
 
+@app.route('/')
+def hello_world():
+    return 'Hello, Flask on VM1!
+    
 # Database configuration
 db_host = "10.0.2.5"
 db_port = 5432
