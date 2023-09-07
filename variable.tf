@@ -17,10 +17,9 @@ variable "subnet2" {
   type = string
   default = "snet-db"
 }
-output "nsg1_public_ips" {
-  value = [
-    for rule in azurerm_network_security_group.nsg1.security_rule :
-    rule.source_address_prefix
-  ]
+
+variable "user" {
+  type = string
 }
+
 
