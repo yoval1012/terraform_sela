@@ -73,13 +73,14 @@ resource "azurerm_network_security_rule" "inbound_rule_nsg2_subnet1" {
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
-  source_port_range           = "10.0.1.0/24"
-  destination_port_range      = "5432"
-  source_address_prefix       = data.azurerm_subnet.subnet1.address_prefixes[0]  
-  destination_address_prefix  = "*"
+  source_port_range           = "*"  # Allow traffic from any source port
+  destination_port_range      = "5432"  # Specify the port you want to allow traffic on
+  source_address_prefix       = "10.0.1.0/24"  # Specify the source IP address range
+  destination_address_prefix  = "*"  # Allow traffic to any destination
   resource_group_name         = azurerm_virtual_network.vnet1.resource_group_name
   network_security_group_name = azurerm_network_security_group.nsg2.name
 }
+
 
 # Define an inbound security rule for NSG2 (open SSH on port 22)
 resource "azurerm_network_security_rule" "inbound_ssh_rule_nsg2" {
@@ -121,27 +122,46 @@ resource "azurerm_subnet_network_security_group_association" "nsg_association2" 
 }
 
 
-resource "tls_private_key" "web_ssh" {
+resource "tls_private_key" "web_ssh_vm1" {
   algorithm = "RSA"
   rsa_bits  = 4096
 }
-resource "local_file" "web1_public_key" {
-  filename = "${path.module}\\web1_key.pem"
-  content = tls_private_key.web_ssh.private_key_pem
+
+resource "tls_private_key" "web_ssh_vm2" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "local_file" "vm1_private_key" {
+  filename = "${path.module}/vm1_key.pem"
+  content  = tls_private_key.web_ssh_vm1.private_key_pem
+}
+
+resource "local_file" "vm2_private_key" {
+  filename = "${path.module}/vm2_key.pem"
+  content  = tls_private_key.web_ssh_vm2.private_key_pem
 }
 
 # ---------------------------------------------------------------------vm1
+
+resource "azurerm_public_ip" "public_ip_vm1" {
+  name                = "public-ip-vm1"
+  location            = var.azure_region
+  resource_group_name = azurerm_resource_group.rg-library-dev.name
+  allocation_method   = "Dynamic"  # You can use "Static" if you need a static IP
+}
 
 resource "azurerm_network_interface" "nic1" {
   name                = "example-nic1"
   location            = var.azure_region
   resource_group_name = var.rg
 
+  
   ip_configuration {
-    name                          = "internal"
-    subnet_id                     = data.azurerm_subnet.subnet1.id 
-    private_ip_address_allocation = "Static"
-    private_ip_address            = "10.0.1.4"
+    name                          = "public"
+    subnet_id                     = data.azurerm_subnet.subnet1.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.public_ip_vm1.id
   }
 }
 
@@ -168,43 +188,50 @@ resource "azurerm_virtual_machine" "vm1" {
   
   os_profile {
     computer_name  = "hostname1"
-    admin_username = "yuvalleibovich"
+    admin_username = var.user
   
   }
   
- os_profile_linux_config {
+  os_profile_linux_config {
     disable_password_authentication = true
 
     ssh_keys {
       path     = "/home/yuvalleibovich/.ssh/authorized_keys"
-      key_data = tls_private_key.web_ssh.public_key_openssh
+      key_data = tls_private_key.web_ssh_vm1.public_key_openssh
     }
   }
 
- 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt-get update",
-      "sudo apt-get install -y python3-pip",
-      "sudo pip3 install Flask",
-      "echo $(hostname -I) >> output.txt"
-    ]
-  }
-  connection {
-  type     = "ssh"
-  user     = "yuvalleibovich"  # Use the correct SSH user
-  host     = "10.0.1.4"
-  private_key = file("~/.ssh/id_rsa_vm1")
-}
 
+ 
+
+
+ }
+ 
+resource "azurerm_virtual_machine_extension" "install_flask" {
+  name                 = "install-flask"
+  virtual_machine_id   = azurerm_virtual_machine.vm1.id  
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.1"
+
+  settings = <<SETTINGS
+    {
+        "script": "${base64encode(file("${path.module}/install-flask.sh"))}"
+    }
+SETTINGS
+
+  protected_settings = <<PROTECTED_SETTINGS
+    {}
+PROTECTED_SETTINGS
+
+  depends_on = [
+    azurerm_virtual_machine.vm1  
+  ]
 }
 
 #--------------------------------------------------------------------vm2
 
-resource "tls_private_key" "web_ssh_vm2" {
-  algorithm = "RSA"
-  rsa_bits  = 2048
-}
+
 
 
 resource "azurerm_network_interface" "nic2" {
@@ -229,8 +256,8 @@ resource "azurerm_virtual_machine" "vm2" {
   
   
   storage_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
+    publisher = "Canonical" #apps-4-rent    cloud-infrastructure-services
+    offer     = "UbuntuServer" #flask-django-on-ubuntu22    postgresql-ubuntu
     sku       = "18.04-LTS"
     version   = "latest"
   }
@@ -244,7 +271,7 @@ resource "azurerm_virtual_machine" "vm2" {
   
   os_profile {
     computer_name  = "hostname2"
-    admin_username = "yuvalleibovich"
+    admin_username = var.user
 
     
   }
@@ -253,28 +280,47 @@ resource "azurerm_virtual_machine" "vm2" {
     disable_password_authentication = true
 
     ssh_keys {
-      path     = "/home/administrato/.ssh/authorized_keys"  # Replace with the correct user's home directory
+      path     = "/home/yuvalleibovich/.ssh/authorized_keys"
       key_data = tls_private_key.web_ssh_vm2.public_key_openssh
     }
   }
 
 
+
   
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt-get update",
-      "sudo apt-get install -y postgresql",
-      "echo $(hostname -I) >> output.txt"
-    ]
-  }
-  connection {
-  type        = "ssh"
-  user        = "yuvalleibovich"
-  host        = "10.0.2.5"
-  private_key = file("~/.ssh/id_rsa_vm2") 
-  }
+  # provisioner "remote-exec" {
+  #   inline = [
+  #     "sudo apt-get update",
+  #     "sudo apt-get install -y postgresql",
+  #     "echo $(hostname -I) >> output.txt"
+  #   ]
+  # }
+  # connection {
+  # type        = "ssh"
+  # user        = "yuvalleibovich"
+  # host        = "10.0.2.5"
+  # private_key = file("~/.ssh/id_rsa_vm2") 
+  # }
 }
 
- 
+resource "azurerm_virtual_machine_extension" "install_postgresql" {
+  name                 = "install-postgresql"
+  virtual_machine_id   = azurerm_virtual_machine.vm2.id  
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.1"
 
+  settings = <<SETTINGS
+    {
+        "script": "${base64encode(file("${path.module}/install_postgresql.sh"))}"
+    }
+SETTINGS
 
+  protected_settings = <<PROTECTED_SETTINGS
+    {}
+PROTECTED_SETTINGS
+
+  depends_on = [
+    azurerm_virtual_machine.vm2  
+  ]
+}

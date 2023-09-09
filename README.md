@@ -1,0 +1,2 @@
+terraform.tfvars
+user      = "yuvalleibovich"
